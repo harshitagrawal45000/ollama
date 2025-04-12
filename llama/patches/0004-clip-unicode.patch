@@ -8,7 +8,7 @@ Subject: [PATCH] clip-unicode
  1 file changed, 39 insertions(+)
 
 diff --git a/examples/llava/clip.cpp b/examples/llava/clip.cpp
-index 44428cc9..bbf4df5d 100644
+index 44428cc9..da09b115 100644
 --- a/examples/llava/clip.cpp
 +++ b/examples/llava/clip.cpp
 @@ -28,6 +28,19 @@
@@ -36,15 +36,15 @@ index 44428cc9..bbf4df5d 100644
              std::vector<uint8_t> read_buf;
  
 +#ifdef _WIN32
-+            int wlen = MultiByteToWideChar(CP_UTF8, 0, fname, -1, NULL, 0);
++            int wlen = MultiByteToWideChar(CP_UTF8, 0, fname.c_str(), -1, NULL, 0);
 +            if (!wlen) {
-+                return NULL;
++                throw std::runtime_error(string_format("%s: failed to convert filename to wide string\n", __func__));
 +            }
 +            wchar_t * wbuf = (wchar_t *) malloc(wlen * sizeof(wchar_t));
-+            wlen = MultiByteToWideChar(CP_UTF8, 0, fname, -1, wbuf, wlen);
++            wlen = MultiByteToWideChar(CP_UTF8, 0, fname.c_str(), -1, wbuf, wlen);
 +            if (!wlen) {
 +                free(wbuf);
-+                return NULL;
++                throw std::runtime_error(string_format("%s: failed to convert filename to wide string\n", __func__));
 +            }
 +#if __GLIBCXX__
 +            int fd = _wopen(wbuf, _O_RDONLY | _O_BINARY);
