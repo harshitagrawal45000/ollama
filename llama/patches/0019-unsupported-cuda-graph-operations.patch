@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: jmorganca <jmorganca@gmail.com>
+Date: Sat, 12 Apr 2025 14:56:19 -0400
+Subject: [PATCH] unsupported cuda graph operations
+
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 8735297e..e26d7864 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -2494,10 +2494,10 @@ static bool check_node_graph_compatibility_and_refresh_copy_ops(ggml_backend_cud
+ #endif
+         }
+ 
+-        if (node->op == GGML_OP_MUL_MAT_ID) {
++        if (node->op == GGML_OP_MUL_MAT_ID || node->op == GGML_OP_CONT || node->op == GGML_OP_DUP) {
+             use_cuda_graph = false; // This node type is not supported by CUDA graph capture
+ #ifndef NDEBUG
+-            GGML_LOG_DEBUG("%s: disabling CUDA graphs due to mul_mat_id\n", __func__);
++            GGML_LOG_DEBUG("%s: disabling CUDA graphs due to unsupported node type\n", __func__);
+ #endif
+         }
+ 
