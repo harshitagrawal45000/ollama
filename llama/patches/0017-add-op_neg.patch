@@ -12,7 +12,7 @@ diff --git a/ggml/src/ggml-metal/ggml-metal.m b/ggml/src/ggml-metal/ggml-metal.m
 index 7c7ca529..febece40 100644
 --- a/ggml/src/ggml-metal/ggml-metal.m
 +++ b/ggml/src/ggml-metal/ggml-metal.m
-@@ -461,6 +461,7 @@ static void ggml_backend_metal_device_rel(struct ggml_backend_metal_device_conte
+@@ -461,6 +461,7 @@ enum ggml_metal_kernel_type {
      GGML_METAL_KERNEL_TYPE_SQRT,
      GGML_METAL_KERNEL_TYPE_SIN,
      GGML_METAL_KERNEL_TYPE_COS,
@@ -20,7 +20,7 @@ index 7c7ca529..febece40 100644
      GGML_METAL_KERNEL_TYPE_SUM_ROWS,
      GGML_METAL_KERNEL_TYPE_POOL_2D_AVG_F32,
      GGML_METAL_KERNEL_TYPE_POOL_2D_MAX_F32,
-@@ -1119,6 +1120,7 @@ @implementation GGMLMetalClass
+@@ -1119,6 +1120,7 @@ static struct ggml_backend_metal_context * ggml_metal_init(ggml_backend_dev_t de
          GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_SQRT,                            sqrt,                            true);
          GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_SIN,                             sin,                             true);
          GGML_METAL_ADD_KERNEL(GGML_METAL_KERNEL_TYPE_COS,                             cos,                             true);

@@ -4,26 +4,25 @@ Date: Tue, 8 Apr 2025 19:27:12 -0700
 Subject: [PATCH] add mllama support
 
 ---
- examples/llava/llava.cpp        |   5 +-
- ggml/src/ggml-backend-reg.cpp   |   6 +-
- ggml/src/ggml-cuda/ggml-cuda.cu |   4 +-
- include/llama.h                 |   6 +
- src/llama-arch.cpp              |  44 +++++
- src/llama-arch.h                |  10 ++
- src/llama-batch.cpp             |   3 +
- src/llama-context.cpp           |  27 ++-
- src/llama-context.h             |   1 +
- src/llama-cparams.h             |   1 +
- src/llama-graph.cpp             |  25 +++
- src/llama-graph.h               |  12 ++
- src/llama-hparams.cpp           |   4 +
- src/llama-hparams.h             |   7 +
- src/llama-kv-cache.cpp          |  12 +-
- src/llama-model-loader.cpp      |   2 +
- src/llama-model.cpp             | 309 +++++++++++++++++++++++++++++++-
- src/llama-model.h               |  12 ++
- src/llama-quant.cpp             |   4 +-
- 19 files changed, 473 insertions(+), 21 deletions(-)
+ examples/llava/llava.cpp      |   5 +-
+ ggml/src/ggml-backend-reg.cpp |   6 +-
+ include/llama.h               |   6 +
+ src/llama-arch.cpp            |  44 +++++
+ src/llama-arch.h              |  10 ++
+ src/llama-batch.cpp           |   3 +
+ src/llama-context.cpp         |  27 ++-
+ src/llama-context.h           |   1 +
+ src/llama-cparams.h           |   1 +
+ src/llama-graph.cpp           |  25 +++
+ src/llama-graph.h             |  12 ++
+ src/llama-hparams.cpp         |   4 +
+ src/llama-hparams.h           |   7 +
+ src/llama-kv-cache.cpp        |  12 +-
+ src/llama-model-loader.cpp    |   2 +
+ src/llama-model.cpp           | 309 +++++++++++++++++++++++++++++++++-
+ src/llama-model.h             |  12 ++
+ src/llama-quant.cpp           |   4 +-
+ 18 files changed, 471 insertions(+), 19 deletions(-)
 
 diff --git a/examples/llava/llava.cpp b/examples/llava/llava.cpp
 index 518aad3f..f0e484a1 100644
@@ -72,23 +71,6 @@ index 405d8e31..82ae1b5b 100644
  #ifdef GGML_USE_RPC
          register_backend(ggml_backend_rpc_reg());
  #endif
-diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
-index 1c7cf8e3..5caffd97 100644
---- a/ggml/src/ggml-cuda/ggml-cuda.cu
-+++ b/ggml/src/ggml-cuda/ggml-cuda.cu
-@@ -2491,10 +2491,10 @@ static bool check_node_graph_compatibility_and_refresh_copy_ops(ggml_backend_cud
- #endif
-         }
- 
--        if (node->op == GGML_OP_MUL_MAT_ID) {
-+        if (node->op == GGML_OP_MUL_MAT_ID || node->op == GGML_OP_CONT || node->op == GGML_OP_DUP) {
-             use_cuda_graph = false; // This node type is not supported by CUDA graph capture
- #ifndef NDEBUG
--            GGML_LOG_DEBUG("%s: disabling CUDA graphs due to mul_mat_id\n", __func__);
-+            GGML_LOG_DEBUG("%s: disabling CUDA graphs due to unsupported node type\n", __func__);
- #endif
-         }
- 
 diff --git a/include/llama.h b/include/llama.h
 index 5fd99f4c..6118240d 100644
 --- a/include/llama.h
