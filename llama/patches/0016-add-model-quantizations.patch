@@ -11,10 +11,10 @@ Subject: [PATCH] add model quantizations
  4 files changed, 24 insertions(+)
 
 diff --git a/src/llama-arch.cpp b/src/llama-arch.cpp
-index 86c40920..940675ff 100644
+index c1f78618..bdf3d898 100644
 --- a/src/llama-arch.cpp
 +++ b/src/llama-arch.cpp
-@@ -70,6 +70,7 @@ static const std::map<llm_arch, const char *> LLM_ARCH_NAMES = {
+@@ -73,6 +73,7 @@ static const std::map<llm_arch, const char *> LLM_ARCH_NAMES = {
      { LLM_ARCH_WAVTOKENIZER_DEC, "wavtokenizer-dec" },
      { LLM_ARCH_PLM,              "plm"              },
      { LLM_ARCH_BAILINGMOE,       "bailingmoe"       },
@@ -22,7 +22,7 @@ index 86c40920..940675ff 100644
      { LLM_ARCH_UNKNOWN,          "(unknown)"        },
  };
  
-@@ -1521,6 +1522,22 @@ static const std::map<llm_arch, std::map<llm_tensor, const char *>> LLM_TENSOR_N
+@@ -1582,6 +1583,22 @@ static const std::map<llm_arch, std::map<llm_tensor, const char *>> LLM_TENSOR_N
              { LLM_TENSOR_FFN_UP_SHEXP,       "blk.%d.ffn_up_shexp" },
          },
      },
@@ -46,10 +46,10 @@ index 86c40920..940675ff 100644
          LLM_ARCH_UNKNOWN,
          {
 diff --git a/src/llama-arch.h b/src/llama-arch.h
-index eba7b4a9..94210229 100644
+index f987844d..ee081fbf 100644
 --- a/src/llama-arch.h
 +++ b/src/llama-arch.h
-@@ -72,6 +72,7 @@ enum llm_arch {
+@@ -75,6 +75,7 @@ enum llm_arch {
      LLM_ARCH_CHAMELEON,
      LLM_ARCH_SOLAR,
      LLM_ARCH_WAVTOKENIZER_DEC,
@@ -58,10 +58,10 @@ index eba7b4a9..94210229 100644
      LLM_ARCH_BAILINGMOE,
      LLM_ARCH_UNKNOWN,
 diff --git a/src/llama-model.cpp b/src/llama-model.cpp
-index b28133da..393f120d 100644
+index d5ad466e..cd1d239c 100644
 --- a/src/llama-model.cpp
 +++ b/src/llama-model.cpp
-@@ -1398,6 +1398,7 @@ void llama_model::load_hparams(llama_model_loader & ml) {
+@@ -1423,6 +1423,7 @@ void llama_model::load_hparams(llama_model_loader & ml) {
                      default: type = LLM_TYPE_UNKNOWN;
                  }
              } break;
@@ -69,7 +69,7 @@ index b28133da..393f120d 100644
          default: throw std::runtime_error("unsupported model architecture");
      }
  
-@@ -13100,6 +13101,7 @@ llama_rope_type llama_model_rope_type(const llama_model * model) {
+@@ -13652,6 +13653,7 @@ llama_rope_type llama_model_rope_type(const llama_model * model) {
          case LLM_ARCH_CHAMELEON:
          case LLM_ARCH_SOLAR:
          case LLM_ARCH_BAILINGMOE:
@@ -78,10 +78,10 @@ index b28133da..393f120d 100644
  
          // the pairs of head values are offset by n_rot/2
 diff --git a/src/llama-quant.cpp b/src/llama-quant.cpp
-index 06a1c6fd..484924fd 100644
+index 223e1f3f..8ae6dde8 100644
 --- a/src/llama-quant.cpp
 +++ b/src/llama-quant.cpp
-@@ -737,6 +737,10 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
+@@ -744,6 +744,10 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
          // This used to be a regex, but <regex> has an extreme cost to compile times.
          bool quantize = name.rfind("weight") == name.size() - 6; // ends with 'weight'?
  

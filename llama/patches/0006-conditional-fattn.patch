@@ -8,7 +8,7 @@ Subject: [PATCH] conditional-fattn
  1 file changed, 2 insertions(+)
 
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
-index 67919e6a..1c7cf8e3 100644
+index c3cea040..1ac8d113 100644
 --- a/ggml/src/ggml-cuda/ggml-cuda.cu
 +++ b/ggml/src/ggml-cuda/ggml-cuda.cu
 @@ -2336,9 +2336,11 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg

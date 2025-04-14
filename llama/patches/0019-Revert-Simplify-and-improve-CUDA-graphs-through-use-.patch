@@ -420,7 +420,7 @@ index 6bed0564..28b06cdd 100644
 -
 -void ggml_cuda_cpy_dest_ptrs_copy(ggml_cuda_graph * cuda_graph, char ** host_dest_ptrs, const int host_dest_ptrs_size, cudaStream_t stream);
 diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
-index 8735297e..8b1625a8 100644
+index 571c39f6..c154e430 100644
 --- a/ggml/src/ggml-cuda/ggml-cuda.cu
 +++ b/ggml/src/ggml-cuda/ggml-cuda.cu
 @@ -2475,11 +2475,10 @@ static void ggml_backend_cuda_synchronize(ggml_backend_t backend) {

@@ -4,7 +4,9 @@ Date: Tue, 8 Apr 2025 19:27:12 -0700
 Subject: [PATCH] add mllama support
 
 ---
+ examples/llava/gemma3-cli.cpp |   3 +-
  examples/llava/llava.cpp      |   5 +-
+ examples/llava/mtmd.cpp       |   6 +-
  ggml/src/ggml-backend-reg.cpp |   6 +-
  include/llama.h               |   6 +
  src/llama-arch.cpp            |  44 +++++
@@ -22,13 +24,34 @@ Subject: [PATCH] add mllama support
  src/llama-model.cpp           | 309 +++++++++++++++++++++++++++++++++-
  src/llama-model.h             |  12 ++
  src/llama-quant.cpp           |   4 +-
- 18 files changed, 471 insertions(+), 19 deletions(-)
+ 20 files changed, 477 insertions(+), 22 deletions(-)
 
+diff --git a/examples/llava/gemma3-cli.cpp b/examples/llava/gemma3-cli.cpp
+index 91a07e2a..13127c7b 100644
+--- a/examples/llava/gemma3-cli.cpp
++++ b/examples/llava/gemma3-cli.cpp
+@@ -106,7 +106,7 @@ struct decode_embd_batch {
+     std::vector<llama_seq_id *> seq_ids;
+     std::vector<int8_t>         logits;
+     llama_batch batch;
+-    decode_embd_batch(float * embd, int32_t n_tokens, llama_pos pos_0, llama_seq_id seq_id) {
++    decode_embd_batch(float * embd, int32_t n_embd, int32_t n_tokens, llama_pos pos_0, llama_seq_id seq_id) {
+         pos     .resize(n_tokens);
+         n_seq_id.resize(n_tokens);
+         seq_ids .resize(n_tokens + 1);
+@@ -118,6 +118,7 @@ struct decode_embd_batch {
+             /*n_tokens       =*/ n_tokens,
+             /*tokens         =*/ nullptr,
+             /*embd           =*/ embd,
++            /*n_embd         =*/ n_embd,
+             /*pos            =*/ pos.data(),
+             /*n_seq_id       =*/ n_seq_id.data(),
+             /*seq_id         =*/ seq_ids.data(),
 diff --git a/examples/llava/llava.cpp b/examples/llava/llava.cpp
-index 518aad3f..f0e484a1 100644
+index 03a22cbb..5eb40bcd 100644
 --- a/examples/llava/llava.cpp
 +++ b/examples/llava/llava.cpp
-@@ -445,7 +445,7 @@ struct llava_embd_batch {
+@@ -456,7 +456,7 @@ struct llava_embd_batch {
      std::vector<llama_seq_id *> seq_ids;
      std::vector<int8_t>         logits;
      llama_batch batch;
@@ -37,7 +60,7 @@ index 518aad3f..f0e484a1 100644
          pos     .resize(n_tokens);
          n_seq_id.resize(n_tokens);
          seq_ids .resize(n_tokens + 1);
-@@ -457,6 +457,7 @@ struct llava_embd_batch {
+@@ -468,6 +468,7 @@ struct llava_embd_batch {
              /*n_tokens       =*/ n_tokens,
              /*tokens         =*/ nullptr,
              /*embd           =*/ embd,
@@ -45,7 +68,7 @@ index 518aad3f..f0e484a1 100644
              /*pos            =*/ pos.data(),
              /*n_seq_id       =*/ n_seq_id.data(),
              /*seq_id         =*/ seq_ids.data(),
-@@ -480,7 +481,7 @@ bool llava_eval_image_embed(llama_context * ctx_llama, const struct llava_image_
+@@ -491,7 +492,7 @@ bool llava_eval_image_embed(llama_context * ctx_llama, const struct llava_image_
              n_eval = n_batch;
          }
          float * embd = image_embed->embed+i*n_embd;
@@ -54,6 +77,37 @@ index 518aad3f..f0e484a1 100644
          if (llama_decode(ctx_llama, llava_batch.batch)) {
              LOG_ERR("%s : failed to eval\n", __func__);
              return false;
+diff --git a/examples/llava/mtmd.cpp b/examples/llava/mtmd.cpp
+index 114c274b..a0e649ad 100644
+--- a/examples/llava/mtmd.cpp
++++ b/examples/llava/mtmd.cpp
+@@ -213,7 +213,7 @@ struct decode_embd_batch {
+     std::vector<llama_seq_id *> seq_ids;
+     std::vector<int8_t>         logits;
+     llama_batch batch;
+-    decode_embd_batch(float * embd, int32_t n_tokens, llama_pos pos_0, llama_seq_id seq_id) {
++    decode_embd_batch(float * embd, int32_t n_embd, int32_t n_tokens, llama_pos pos_0, llama_seq_id seq_id) {
+         pos     .resize(n_tokens);
+         n_seq_id.resize(n_tokens);
+         seq_ids .resize(n_tokens + 1);
+@@ -225,6 +225,7 @@ struct decode_embd_batch {
+             /*n_tokens       =*/ n_tokens,
+             /*tokens         =*/ nullptr,
+             /*embd           =*/ embd,
++            /*n_embd         =*/ n_embd,
+             /*pos            =*/ pos.data(),
+             /*n_seq_id       =*/ n_seq_id.data(),
+             /*seq_id         =*/ seq_ids.data(),
+@@ -291,7 +292,8 @@ int32_t mtmd_helper_eval(mtmd_context * ctx,
+ 
+             int32_t n_tokens = chunk.tokens_image->n_tokens();
+             float * embd = mtmd_get_output_embd(ctx);
+-            decode_embd_batch batch_img(embd, n_tokens, n_past, 0);
++            int n_embd  = llama_model_n_embd(llama_get_model(lctx));
++            decode_embd_batch batch_img(embd, n_embd, n_tokens, n_past, 0);
+             int64_t t1 = ggml_time_ms();
+             ret = llama_decode(lctx, batch_img.batch);
+             if (ret != 0) {
 diff --git a/ggml/src/ggml-backend-reg.cpp b/ggml/src/ggml-backend-reg.cpp
 index 405d8e31..82ae1b5b 100644
 --- a/ggml/src/ggml-backend-reg.cpp
@@ -72,7 +126,7 @@ index 405d8e31..82ae1b5b 100644
          register_backend(ggml_backend_rpc_reg());
  #endif
 diff --git a/include/llama.h b/include/llama.h
-index 5fd99f4c..6118240d 100644
+index 5657fbf0..f91896e4 100644
 --- a/include/llama.h
 +++ b/include/llama.h
 @@ -255,6 +255,7 @@ extern "C" {
@@ -91,7 +145,7 @@ index 5fd99f4c..6118240d 100644
  
          // Abort callback
          // if it returns true, execution of llama_decode() will be aborted
-@@ -457,6 +459,10 @@ extern "C" {
+@@ -458,6 +460,10 @@ extern "C" {
              struct llama_context_params   params),
              "use llama_init_from_model instead");
  
@@ -103,7 +157,7 @@ index 5fd99f4c..6118240d 100644
      LLAMA_API void llama_free(struct llama_context * ctx);
  
 diff --git a/src/llama-arch.cpp b/src/llama-arch.cpp
-index b5c31d0c..86c40920 100644
+index 0b0fedcd..c1f78618 100644
 --- a/src/llama-arch.cpp
 +++ b/src/llama-arch.cpp
 @@ -6,6 +6,7 @@
@@ -114,7 +168,7 @@ index b5c31d0c..86c40920 100644
      { LLM_ARCH_LLAMA4,           "llama4"           },
      { LLM_ARCH_DECI,             "deci"             },
      { LLM_ARCH_FALCON,           "falcon"           },
-@@ -139,6 +140,7 @@ static const std::map<llm_kv, const char *> LLM_KV_NAMES = {
+@@ -142,6 +143,7 @@ static const std::map<llm_kv, const char *> LLM_KV_NAMES = {
      { LLM_KV_ATTENTION_SLIDING_WINDOW,               "%s.attention.sliding_window"               },
      { LLM_KV_ATTENTION_SCALE,                        "%s.attention.scale"                        },
      { LLM_KV_ATTENTION_BLOCK_SKIP_CONNECTION,        "%s.attention.block_skip_connection"        },
@@ -122,7 +176,7 @@ index b5c31d0c..86c40920 100644
  
      { LLM_KV_ROPE_DIMENSION_COUNT,      "%s.rope.dimension_count"                 },
      { LLM_KV_ROPE_DIMENSION_SECTIONS,   "%s.rope.dimension_sections"              },
-@@ -266,6 +268,40 @@ static const std::map<llm_arch, std::map<llm_tensor, const char *>> LLM_TENSOR_N
+@@ -269,6 +271,40 @@ static const std::map<llm_arch, std::map<llm_tensor, const char *>> LLM_TENSOR_N
              { LLM_TENSOR_FFN_UP_SHEXP,    "blk.%d.ffn_up_shexp" },
          },
      },
@@ -163,7 +217,7 @@ index b5c31d0c..86c40920 100644
      {
          LLM_ARCH_DECI,
          {
-@@ -1631,6 +1667,14 @@ static const std::map<llm_tensor, llm_tensor_info> LLM_TENSOR_INFOS = {
+@@ -1692,6 +1728,14 @@ static const std::map<llm_tensor, llm_tensor_info> LLM_TENSOR_INFOS = {
      // this tensor is loaded for T5, but never used
      {LLM_TENSOR_DEC_CROSS_ATTN_REL_B,       {LLM_TENSOR_LAYER_REPEATING, GGML_OP_NONE}},
      {LLM_TENSOR_BSKCN_TV,                   {LLM_TENSOR_LAYER_REPEATING, GGML_OP_MUL}},
@@ -179,7 +233,7 @@ index b5c31d0c..86c40920 100644
      {LLM_TENSOR_POS_NET_NORM,               {LLM_TENSOR_LAYER_REPEATING, GGML_OP_MUL}},
      {LLM_TENSOR_POS_NET_NORM1,              {LLM_TENSOR_LAYER_REPEATING, GGML_OP_MUL}},
 diff --git a/src/llama-arch.h b/src/llama-arch.h
-index 96c4c995..eba7b4a9 100644
+index 74aa3dd0..f987844d 100644
 --- a/src/llama-arch.h
 +++ b/src/llama-arch.h
 @@ -11,6 +11,7 @@
@@ -190,7 +244,7 @@ index 96c4c995..eba7b4a9 100644
      LLM_ARCH_DECI,
      LLM_ARCH_FALCON,
      LLM_ARCH_BAICHUAN,
-@@ -143,6 +144,7 @@ enum llm_kv {
+@@ -146,6 +147,7 @@ enum llm_kv {
      LLM_KV_ATTENTION_SLIDING_WINDOW,
      LLM_KV_ATTENTION_SCALE,
      LLM_KV_ATTENTION_BLOCK_SKIP_CONNECTION,
@@ -198,7 +252,7 @@ index 96c4c995..eba7b4a9 100644
  
      LLM_KV_ROPE_DIMENSION_COUNT,
      LLM_KV_ROPE_DIMENSION_SECTIONS,
-@@ -338,6 +340,14 @@ enum llm_tensor {
+@@ -343,6 +345,14 @@ enum llm_tensor {
      LLM_TENSOR_CLS,
      LLM_TENSOR_CLS_OUT,
      LLM_TENSOR_BSKCN_TV,
@@ -540,7 +594,7 @@ index a012aeae..2e11507d 100644
      bool llama_model_loader::get_arr(const std::string & key, std::array<T, N_MAX> & result, bool required) {
          const int kid = gguf_find_key(meta.get(), key.c_str());
 diff --git a/src/llama-model.cpp b/src/llama-model.cpp
-index 84969d2d..b28133da 100644
+index 5fbd0055..d5ad466e 100644
 --- a/src/llama-model.cpp
 +++ b/src/llama-model.cpp
 @@ -419,6 +419,7 @@ void llama_model::load_hparams(llama_model_loader & ml) {
@@ -597,7 +651,7 @@ index 84969d2d..b28133da 100644
          case LLM_ARCH_DECI:
              {
                  ml.get_key(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS, hparams.f_norm_rms_eps);
-@@ -1523,7 +1537,7 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
+@@ -1548,7 +1562,7 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
          const int64_t n_embd_head_v = hparams.n_embd_head_v;
          const int64_t n_ff          = hparams.n_ff();
          const int64_t n_embd_gqa    = n_embd_v_gqa;
@@ -606,7 +660,7 @@ index 84969d2d..b28133da 100644
          const int64_t n_token_types = vocab.n_token_types();
          const int64_t n_rot         = hparams.n_rot;
          const int64_t n_expert      = hparams.n_expert;
-@@ -1776,6 +1790,52 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
+@@ -1801,6 +1815,52 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
                          }
                      }
                  } break;
@@ -659,7 +713,7 @@ index 84969d2d..b28133da 100644
              case LLM_ARCH_DECI:
                  {
                      tok_embd = create_tensor(tn(LLM_TENSOR_TOKEN_EMBD, "weight"), {n_embd, n_vocab}, 0);
-@@ -4526,6 +4586,246 @@ struct llm_build_llama : public llm_graph_context {
+@@ -4665,6 +4725,246 @@ struct llm_build_llama : public llm_graph_context {
      }
  };
  
@@ -906,7 +960,7 @@ index 84969d2d..b28133da 100644
  struct llm_build_deci : public llm_graph_context {
      llm_build_deci(const llama_model & model, const llm_graph_params & params, ggml_cgraph * gf) : llm_graph_context(params) {
          const int64_t n_embd_head = hparams.n_embd_head_v;
-@@ -12426,6 +12726,10 @@ llm_graph_result_ptr llama_model::build_graph(
+@@ -12965,6 +13265,10 @@ llm_graph_result_ptr llama_model::build_graph(
              {
                  llm = std::make_unique<llm_build_llama>(*this, params, gf);
              } break;
@@ -917,7 +971,7 @@ index 84969d2d..b28133da 100644
          case LLM_ARCH_DECI:
              {
                  llm = std::make_unique<llm_build_deci>(*this, params, gf);
-@@ -12774,6 +13078,7 @@ llama_rope_type llama_model_rope_type(const llama_model * model) {
+@@ -13325,6 +13629,7 @@ llama_rope_type llama_model_rope_type(const llama_model * model) {
          // use what we call a normal RoPE, operating on pairs of consecutive head values
          case LLM_ARCH_LLAMA:
          case LLM_ARCH_LLAMA4:
@@ -963,10 +1017,10 @@ index e08d4ae4..21c4617b 100644
  
      struct llama_layer_convnext convnext;
 diff --git a/src/llama-quant.cpp b/src/llama-quant.cpp
-index e3e10fa6..06a1c6fd 100644
+index 7dc54227..223e1f3f 100644
 --- a/src/llama-quant.cpp
 +++ b/src/llama-quant.cpp
-@@ -632,7 +632,9 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
+@@ -639,7 +639,9 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
          if (llama_model_has_encoder(&model)) {
              n_attn_layer *= 3;
          }

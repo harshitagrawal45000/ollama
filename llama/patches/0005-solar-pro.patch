@@ -14,10 +14,10 @@ Subject: [PATCH] solar-pro
  7 files changed, 248 insertions(+)
 
 diff --git a/src/llama-arch.cpp b/src/llama-arch.cpp
-index ac997b96..b5c31d0c 100644
+index a6fddc7f..0b0fedcd 100644
 --- a/src/llama-arch.cpp
 +++ b/src/llama-arch.cpp
-@@ -65,6 +65,7 @@ static const std::map<llm_arch, const char *> LLM_ARCH_NAMES = {
+@@ -68,6 +68,7 @@ static const std::map<llm_arch, const char *> LLM_ARCH_NAMES = {
      { LLM_ARCH_GRANITE,          "granite"          },
      { LLM_ARCH_GRANITE_MOE,      "granitemoe"       },
      { LLM_ARCH_CHAMELEON,        "chameleon"        },
@@ -25,7 +25,7 @@ index ac997b96..b5c31d0c 100644
      { LLM_ARCH_WAVTOKENIZER_DEC, "wavtokenizer-dec" },
      { LLM_ARCH_PLM,              "plm"              },
      { LLM_ARCH_BAILINGMOE,       "bailingmoe"       },
-@@ -137,6 +138,7 @@ static const std::map<llm_kv, const char *> LLM_KV_NAMES = {
+@@ -140,6 +141,7 @@ static const std::map<llm_kv, const char *> LLM_KV_NAMES = {
      { LLM_KV_ATTENTION_RELATIVE_BUCKETS_COUNT,       "%s.attention.relative_buckets_count"       },
      { LLM_KV_ATTENTION_SLIDING_WINDOW,               "%s.attention.sliding_window"               },
      { LLM_KV_ATTENTION_SCALE,                        "%s.attention.scale"                        },
@@ -33,7 +33,7 @@ index ac997b96..b5c31d0c 100644
  
      { LLM_KV_ROPE_DIMENSION_COUNT,      "%s.rope.dimension_count"                 },
      { LLM_KV_ROPE_DIMENSION_SECTIONS,   "%s.rope.dimension_sections"              },
-@@ -1417,6 +1419,24 @@ static const std::map<llm_arch, std::map<llm_tensor, const char *>> LLM_TENSOR_N
+@@ -1478,6 +1480,24 @@ static const std::map<llm_arch, std::map<llm_tensor, const char *>> LLM_TENSOR_N
              { LLM_TENSOR_ATTN_K_NORM,     "blk.%d.attn_k_norm" },
          },
      },
@@ -58,7 +58,7 @@ index ac997b96..b5c31d0c 100644
      {
          LLM_ARCH_WAVTOKENIZER_DEC,
          {
-@@ -1610,6 +1630,7 @@ static const std::map<llm_tensor, llm_tensor_info> LLM_TENSOR_INFOS = {
+@@ -1671,6 +1691,7 @@ static const std::map<llm_tensor, llm_tensor_info> LLM_TENSOR_INFOS = {
      {LLM_TENSOR_FFN_EXP_PROBS_B,            {LLM_TENSOR_LAYER_REPEATING, GGML_OP_ADD}},
      // this tensor is loaded for T5, but never used
      {LLM_TENSOR_DEC_CROSS_ATTN_REL_B,       {LLM_TENSOR_LAYER_REPEATING, GGML_OP_NONE}},
@@ -67,10 +67,10 @@ index ac997b96..b5c31d0c 100644
      {LLM_TENSOR_POS_NET_NORM,               {LLM_TENSOR_LAYER_REPEATING, GGML_OP_MUL}},
      {LLM_TENSOR_POS_NET_NORM1,              {LLM_TENSOR_LAYER_REPEATING, GGML_OP_MUL}},
 diff --git a/src/llama-arch.h b/src/llama-arch.h
-index 42e4a3ef..96c4c995 100644
+index 2c2099b3..74aa3dd0 100644
 --- a/src/llama-arch.h
 +++ b/src/llama-arch.h
-@@ -69,6 +69,7 @@ enum llm_arch {
+@@ -72,6 +72,7 @@ enum llm_arch {
      LLM_ARCH_GRANITE,
      LLM_ARCH_GRANITE_MOE,
      LLM_ARCH_CHAMELEON,
@@ -78,7 +78,7 @@ index 42e4a3ef..96c4c995 100644
      LLM_ARCH_WAVTOKENIZER_DEC,
      LLM_ARCH_PLM,
      LLM_ARCH_BAILINGMOE,
-@@ -141,6 +142,7 @@ enum llm_kv {
+@@ -144,6 +145,7 @@ enum llm_kv {
      LLM_KV_ATTENTION_RELATIVE_BUCKETS_COUNT,
      LLM_KV_ATTENTION_SLIDING_WINDOW,
      LLM_KV_ATTENTION_SCALE,
@@ -86,7 +86,7 @@ index 42e4a3ef..96c4c995 100644
  
      LLM_KV_ROPE_DIMENSION_COUNT,
      LLM_KV_ROPE_DIMENSION_SECTIONS,
-@@ -335,6 +337,7 @@ enum llm_tensor {
+@@ -340,6 +342,7 @@ enum llm_tensor {
      LLM_TENSOR_ENC_OUTPUT_NORM,
      LLM_TENSOR_CLS,
      LLM_TENSOR_CLS_OUT,
@@ -149,10 +149,10 @@ index ea73a8a7..a012aeae 100644
  llama_model_loader::llama_model_loader(
          const std::string & fname,
 diff --git a/src/llama-model.cpp b/src/llama-model.cpp
-index 4546e9cf..84969d2d 100644
+index b74dd72c..5fbd0055 100644
 --- a/src/llama-model.cpp
 +++ b/src/llama-model.cpp
-@@ -1347,6 +1347,21 @@ void llama_model::load_hparams(llama_model_loader & ml) {
+@@ -1372,6 +1372,21 @@ void llama_model::load_hparams(llama_model_loader & ml) {
                      default: type = LLM_TYPE_UNKNOWN;
                 }
              } break;
@@ -174,7 +174,7 @@ index 4546e9cf..84969d2d 100644
          case LLM_ARCH_WAVTOKENIZER_DEC:
              {
                  ml.get_key(LLM_KV_ATTENTION_LAYERNORM_EPS,    hparams.f_norm_eps);
-@@ -3739,6 +3754,34 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
+@@ -3701,6 +3716,34 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
  
                          layer.ffn_norm = create_tensor(tn(LLM_TENSOR_FFN_NORM, "weight", i), {n_embd}, 0);
  
@@ -209,7 +209,7 @@ index 4546e9cf..84969d2d 100644
                          layer.ffn_gate = create_tensor(tn(LLM_TENSOR_FFN_GATE, "weight", i), {n_embd,   n_ff}, 0);
                          layer.ffn_down = create_tensor(tn(LLM_TENSOR_FFN_DOWN, "weight", i), {  n_ff, n_embd}, 0);
                          layer.ffn_up   = create_tensor(tn(LLM_TENSOR_FFN_UP,   "weight", i), {n_embd,   n_ff}, 0);
-@@ -11705,6 +11748,165 @@ struct llm_build_chameleon : public llm_graph_context {
+@@ -12244,6 +12287,165 @@ struct llm_build_chameleon : public llm_graph_context {
      }
  };
  
@@ -375,7 +375,7 @@ index 4546e9cf..84969d2d 100644
  struct llm_build_wavtokenizer_dec : public llm_graph_context {
      llm_build_wavtokenizer_dec(const llama_model & model, const llm_graph_params & params, ggml_cgraph * gf) : llm_graph_context(params) {
          ggml_tensor * cur;
-@@ -12442,6 +12644,10 @@ llm_graph_result_ptr llama_model::build_graph(
+@@ -12993,6 +13195,10 @@ llm_graph_result_ptr llama_model::build_graph(
              {
                  llm = std::make_unique<llm_build_chameleon>(*this, params, gf);
              } break;
@@ -386,7 +386,7 @@ index 4546e9cf..84969d2d 100644
          case LLM_ARCH_WAVTOKENIZER_DEC:
              {
                  llm = std::make_unique<llm_build_wavtokenizer_dec>(*this, params, gf);
-@@ -12587,6 +12793,7 @@ llama_rope_type llama_model_rope_type(const llama_model * model) {
+@@ -13139,6 +13345,7 @@ llama_rope_type llama_model_rope_type(const llama_model * model) {
          case LLM_ARCH_GRANITE:
          case LLM_ARCH_GRANITE_MOE:
          case LLM_ARCH_CHAMELEON:

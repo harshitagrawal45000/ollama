@@ -1339,8 +1339,9 @@ static bool ggml_metal_supports_op(const struct ggml_backend_metal_device_contex
             return op->src[0]->type == GGML_TYPE_F16;
         case GGML_OP_POOL_1D:
             return false;
-        case GGML_OP_POOL_2D:
         case GGML_OP_UPSCALE:
+            return op->src[0]->type == GGML_TYPE_F32 && op->op_params[0] == GGML_SCALE_MODE_NEAREST;
+        case GGML_OP_POOL_2D:
         case GGML_OP_PAD:
         case GGML_OP_PAD_REFLECT_1D:
         case GGML_OP_UNPAD:
@@ -3717,7 +3718,7 @@ static void ggml_metal_encode_node(
                 const int nth = MIN(1024, ne0);
 
                 [encoder dispatchThreadgroups:MTLSizeMake(ne1, ne2, ne3) threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
-             } break;
+            } break;
         case GGML_OP_ARANGE:
             {
                 GGML_ASSERT(dst->type == GGML_TYPE_F32);
