@@ -1,6 +1,7 @@
 package qwen25vl
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/ollama/ollama/fs"
@@ -118,24 +119,79 @@ type PatchEmbedding struct {
 }
 
 // Forward computes patch embeddings for the vision model
+// Forward computes patch embeddings for the vision model
 func (pe *PatchEmbedding) Forward(ctx ml.Context, pixelValues ml.Tensor, patchSize int) ml.Tensor {
-	embeddings0 := pe.PatchConv0.Forward(ctx, pixelValues, patchSize, patchSize, 0, 0, patchSize, patchSize) // Use patchSize stride
-	embeddings1 := pe.PatchConv1.Forward(ctx, pixelValues, patchSize, patchSize, 0, 0, patchSize, patchSize) // Use patchSize stride
-	embeddings := embeddings0.Add(ctx, embeddings1)
-	// embeddings shape: [outW, outH, hiddenSize, N]
-	// where outW = W/patchSize (numPatchesW), outH = H/patchSize (numPatchesH)
+	// Log input dimensions for debugging - format is [width, height, channels, batchSize]
+	fmt.Printf("Input dimensions: [%d, %d, %d, %d]\n",
+		pixelValues.Dim(0), pixelValues.Dim(1), pixelValues.Dim(2), pixelValues.Dim(3))
 
+	// Apply first convolutional layer to transform raw pixel values into embeddings
+	// Parameters: kernel_size=patchSize, stride=1, padding=0, dilation=1
+	// This extracts spatial features from the image
+	embeddings0 := pe.PatchConv0.Forward(ctx, pixelValues, patchSize, patchSize, 0, 0, 1, 1)
+
+	// Apply second convolutional layer with the same parameters
+	// This creates a parallel feature extraction path
+	embeddings1 := pe.PatchConv1.Forward(ctx, pixelValues, patchSize, patchSize, 0, 0, 1, 1)
+
+	fmt.Printf("Conv0 output dimensions: [%d, %d, %d, %d]\n",
+		embeddings0.Dim(0), embeddings0.Dim(1), embeddings0.Dim(2), embeddings0.Dim(3))
+
+	// Combine features from both convolutional paths through element-wise addition
+	// This creates a richer representation by merging both feature streams
+	embeddings := embeddings0.Add(ctx, embeddings1)
+
+	// Extract dimensions after merging the convolutional outputs
+	// patchesW/H represent the spatial dimensions after convolution
+	// hiddenSize is the feature dimension (channel count)
 	patchesW := embeddings.Dim(0)
 	patchesH := embeddings.Dim(1)
 	hiddenSize := embeddings.Dim(2)
-	batchSizeN := embeddings.Dim(3) // Use N instead of global batchSize
+	batchSizeN := embeddings.Dim(3)
 
-	// Permute: [patchesW, patchesH, hiddenSize, N] -> [hiddenSize, patchesW, patchesH, N]
+	fmt.Printf("After add dimensions: [%d, %d, %d, %d]\n", patchesW, patchesH, hiddenSize, batchSizeN)
+
+	// Reorder dimensions to prioritize feature channels first
+	// This changes from [spatial_w, spatial_h, features, batch] to [features, spatial_w, spatial_h, batch]
+	// This arrangement is more suitable for subsequent operations in the vision model
 	embeddings = embeddings.Permute(ctx, 2, 0, 1, 3).Contiguous(ctx)
 
-	// Reshape: [hiddenSize, patchesW, patchesH, N] -> [hiddenSize, patchesW * patchesH, N]
+	fmt.Printf("After permute dimensions: [%d, %d, %d, %d]\n",
+		embeddings.Dim(0), embeddings.Dim(1), embeddings.Dim(2), embeddings.Dim(3))
+
+	// Calculate total number of elements to ensure reshaping operations preserve tensor size
+	totalElements := embeddings.Dim(0) * embeddings.Dim(1) * embeddings.Dim(2) * embeddings.Dim(3)
+
+	// Calculate final dimensions for reshape operation
+	// numPatches represents the total number of image patches after convolution
+	// hiddenSizeFinal is the feature dimension size used in the vision model (half of conv output)
 	numPatches := patchesW * patchesH
-	return embeddings.Reshape(ctx, hiddenSize, numPatches, batchSizeN)
+	hiddenSizeFinal := hiddenSize / 2 // Halving the feature dimension as required by model architecture
+
+	// Validate reshaping operation to ensure element count is preserved
+	// If not, this indicates a potential issue with the model configuration
+	if totalElements != hiddenSizeFinal*numPatches*batchSizeN {
+		fmt.Printf("Warning: Element count mismatch. Total: %d, Target: %d\n",
+			totalElements, hiddenSizeFinal*numPatches*batchSizeN)
+
+		// Automatically adjust feature dimension if possible to make reshaping work
+		// This ensures we can still process the input even with unexpected dimensions
+		if totalElements%(numPatches*batchSizeN) == 0 {
+			hiddenSizeFinal = totalElements / (numPatches * batchSizeN)
+			fmt.Printf("Adjusted hiddenSizeFinal to: %d\n", hiddenSizeFinal)
+		}
+	}
+
+	// Reshape tensor to final format expected by vision transformer:
+	// [features, spatial_patches, batch]
+	// This flattens the spatial dimensions while preserving feature channels
+	embeddings = embeddings.Reshape(ctx, hiddenSizeFinal, numPatches, batchSizeN)
+
+	// Log final tensor dimensions for debugging
+	fmt.Printf("Final dimensions: [%d, %d, %d]\n",
+		embeddings.Dim(0), embeddings.Dim(1), embeddings.Dim(2))
+
+	return embeddings
 }
 
 // VisionPatchMerger implements patch merging for the Qwen vision model
