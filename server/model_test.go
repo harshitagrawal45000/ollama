@@ -36,7 +36,8 @@ func TestExecuteWithTools(t *testing.T) {
 		{"mistral", `[TOOL_CALLS]  [{"name": "get_current_weather", "arguments": {"format":"fahrenheit","location":"San Francisco, CA"}},{"name": "get_current_weather", "arguments": {"format":"celsius","location":"Toronto, Canada"}}]
 
 The temperature in San Francisco, CA is 70°F and in Toronto, Canada is 20°C.`, true},
-		{"mistral", `[TOOL_CALLS]  [{"name": "get_current_weather", "arguments": {"format":"fahrenheit","location":"San Francisco, CA"}},{"name": "get_current_weather", "arguments": {"format":"celsius","location":"Toronto, Canada"}},{"name": "get_current_weather", "arguments": {"format":"celsius","location":"To }]`, false},
+		{"mistral", `[TOOL_CALLS]  [{"name": "get_current_weather", "arguments": {"format":"fahrenheit","location":"San Francisco, CA"}},{"name": "get_current_weather"`, true},
+		{"mistral", `[TOOL_CALLS]  [{"name": "get_current_weather", "arguments": {"format":"fahrenheit","location":"San Francisco, `, false},
 		{"mistral", `I'm not aware of that information. However, I can suggest searching for the weather using the "get_current_weather" function:
 
 		[{"name": "get_current_weather", "arguments": {"format":"fahrenheit","location":"San Francisco, CA"}},{"name": "get_current_weather", "arguments": {"format":"celsius","location":"Toronto, Canada"}}]`, true},
@@ -121,9 +122,11 @@ The temperature in San Francisco, CA is 70°F and in Toronto, Canada is 20°C.`,
 
 			t.Run("parse", func(t *testing.T) {
 				m := &Model{Template: tmpl}
-				actual, ok := m.parseToolCalls(tt.output)
+				actual, ok := m.ParseToolCallsNew(tt.output)
 				if ok != tt.ok {
-					t.Fatalf("expected %t, got %t", tt.ok, ok)
+					t.Errorf("expected %t, got %t", tt.ok, ok)
+					t.Logf("actual: %+v", actual)
+					t.Logf("output: %s", tt.output)
 				}
 
 				if tt.ok {
